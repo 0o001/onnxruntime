@@ -199,6 +199,7 @@ Status AllToAll::ComputeInternal(OpKernelContext* context) const {
 
   char* output_data = static_cast<char*>(context->Output(0, out_shape)->MutableDataRaw());
 
+  CUDA_CALL_THROW(cudaStreamSynchronize(nullptr));
   NCCL_RETURN_IF_ERROR(ncclGroupStart());
   for (int32_t r = 0; r < group_size_; r++) {
     NCCL_RETURN_IF_ERROR(ncclSend(input_data, rank_stride, dtype, r, comm, Stream(context)));
@@ -207,6 +208,7 @@ Status AllToAll::ComputeInternal(OpKernelContext* context) const {
     output_data += (rank_stride * element_size);
   }
   NCCL_RETURN_IF_ERROR(ncclGroupEnd());
+  CUDA_CALL_THROW(cudaStreamSynchronize(nullptr));
 
   return Status::OK();
 }
