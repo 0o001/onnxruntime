@@ -14,7 +14,6 @@ from ._custom_autograd_function_exporter import PythonOpShapeInferStore
 from ._utils import get_fully_qualified_class_name
 
 STAGE3_PULL_WEIGHT_TRIGGER_NAME = "pull_weight_trigger"
-_WeightRetrievalFunctionHolder: List[Optional[type]] = [None]
 
 
 def post_processing_enable_zero_stage3_compat(
@@ -182,7 +181,7 @@ def _create_weight_retrieval_function(offload_named_params: Optional[Dict[str, t
 
     func_full_qual_name = get_fully_qualified_class_name(WeightRetrievalFunction)
     register_torch_autograd_function(func_full_qual_name, WeightRetrievalFunction)
-    _WeightRetrievalFunctionHolder[0] = WeightRetrievalFunction
+    PythonOpShapeInferStore.register(WeightRetrievalFunction)
 
     return func_full_qual_name
 
