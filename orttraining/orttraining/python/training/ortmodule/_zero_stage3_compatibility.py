@@ -133,7 +133,6 @@ def post_processing_enable_zero_stage3_compat(
         graph_input for graph_input in exported_model.graph.input if graph_input.name in offload_named_params
     ]
     for input_to_remove in graph_inputs_to_remove:
-        print(f"removing param {input_to_remove.name} from graph input")
         exported_model.graph.input.remove(input_to_remove)
 
     # Re-order graph input to make sure the weight pull trigger is before all parameter inputs.
