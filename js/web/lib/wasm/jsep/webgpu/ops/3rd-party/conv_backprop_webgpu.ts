@@ -26,7 +26,8 @@ import {ConvTransposeAttributes} from '../conv-transpose';
 
 const createConvTranspose2DOpProgramShaderSource =
     (shaderHelper: ShaderHelper, inputs: readonly TensorView[], attributes: ConvTransposeAttributes,
-     outputShape: readonly number[], hasBias: boolean, elementsPerThread: readonly number[]): string => {
+     outputShape: readonly number[], hasBias: boolean, elementsPerThread: readonly number[],
+     is1DimensionDispatch: boolean): string => {
       const isChannelsLast = attributes.format === 'NHWC';
       const rowDim = isChannelsLast ? 1 : 2;
       const colDim = isChannelsLast ? 2 : 3;
@@ -60,10 +61,10 @@ const createConvTranspose2DOpProgramShaderSource =
       const dy = inputVariable('Dy', inputs[0].dataType, inputs[0].dims, components);
       const output = outputVariable('result', inputs[0].dataType, outputShape, components);
       const codeSnippet4 = `{
-        let batch: u32 = global_id.z / outShape[1];
-        let r = global_id.z % outShape[1];
-        let c = global_id.y * ${workPerThread};
-        let d1: u32 = global_id.x * 4;
+        let batch: u32 = ${is1DimensionDispatch ? 'global_id.z' : 'workgroup_id.z'} / outShape[1];
+        let r = ${is1DimensionDispatch ? 'global_id.z' : 'workgroup_id.z'} % outShape[1];
+        let c = ${is1DimensionDispatch ? 'global_id.y' : 'workgroup_id.y'} * ${workPerThread};
+        let d1: u32 = ${is1DimensionDispatch ? 'global_id.x' : 'workgroup_id.x'} * 4;
 
         let dyCorner = vec2<i32>(i32(r), i32(c)) - vec2<i32>(pads);
 
@@ -273,6 +274,7 @@ export const createConvTranspose2DProgramInfo =
         }],
         dispatchGroup: () => ({x: dispatch[0], y: dispatch[1], z: dispatch[2]}),
         getShaderSource: (shaderHelper: ShaderHelper) => createConvTranspose2DOpProgramShaderSource(
-            shaderHelper, inputs, attributes, outputShape, hasBias, elementsPerThread),
+            shaderHelper, inputs, attributes, outputShape, hasBias, elementsPerThread,
+            dispatch[1] === 1 && dispatch[2] === 1),
       };
     };
