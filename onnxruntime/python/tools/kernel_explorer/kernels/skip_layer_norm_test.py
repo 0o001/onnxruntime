@@ -114,7 +114,6 @@ simplified = [True, False]
 @pytest.mark.parametrize("simplified", simplified)
 def test_skip_layer_norm(bert_sizes, dtype, simplified):
     for func in dtype_to_funcs(dtype, simplified):
-        # print(f"Testing {func} with {bert_sizes} and {dtype} , simplified={simplified}")
         run_skip_layer_norm(*bert_sizes, dtype, func, simplified)
 
 
