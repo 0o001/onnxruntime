@@ -85,17 +85,15 @@ Status SkipLayerNorm<T, Simplified>::ComputeInternal(OpKernelContext* ctx) const
                            "Last dimension of gamma and input does not match");
   }
 
-  if constexpr (!Simplified) {
-    if (nullptr != beta) {
-      const auto& beta_dims = beta->Shape().GetDims();
-      if (beta_dims.size() != 1) {
-        return ORT_MAKE_STATUS(ONNXRUNTIME, INVALID_ARGUMENT,
-                               "beta is expected to have 1 dimension, got ", beta_dims.size());
-      }
-      if (beta_dims[0] != hidden_size) {
-        return ORT_MAKE_STATUS(ONNXRUNTIME, INVALID_ARGUMENT,
-                               "Last dimension of beta and input does not match");
-      }
+  if (nullptr != beta) {
+    const auto& beta_dims = beta->Shape().GetDims();
+    if (beta_dims.size() != 1) {
+      return ORT_MAKE_STATUS(ONNXRUNTIME, INVALID_ARGUMENT,
+                             "beta is expected to have 1 dimension, got ", beta_dims.size());
+    }
+    if (beta_dims[0] != hidden_size) {
+      return ORT_MAKE_STATUS(ONNXRUNTIME, INVALID_ARGUMENT,
+                             "Last dimension of beta and input does not match");
     }
   }
 
