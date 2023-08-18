@@ -11,7 +11,7 @@ from itertools import product
 import kernel_explorer as ke
 import numpy as np
 import pytest
-from utils import dtype_to_bytes, standardization, root_mean_square
+from utils import dtype_to_bytes, root_mean_square, standardization
 
 
 def get_bert_sizes_test():
