@@ -258,6 +258,7 @@ stages:
           -B $(Build.BinariesDirectory)
           -V $(RocmVersion)
           -I onnxruntimetrainingrocmbuild-rocm$(RocmVersion)
+          -P python3.10
 
     - script: |
        set -e -x
