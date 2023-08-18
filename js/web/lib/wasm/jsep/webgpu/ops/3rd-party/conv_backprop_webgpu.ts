@@ -55,9 +55,10 @@ const createConvTranspose2DOpProgramShaderSource =
       return bias[coords.${isChannelsLast ? 'w' : 'y'}${isVec4 ? '/ 4' : ''}];
     }`;
       }
-      const w = inputVariable('W', inputs[1].dataType, inputs[1].dims);
-      const dy = inputVariable('Dy', inputs[0].dataType, inputs[0].dims);
-      const output = outputVariable('result', inputs[0].dataType, outputShape);
+      const components = isVec4 ? 4 : 1;
+      const w = inputVariable('W', inputs[1].dataType, inputs[1].dims, components);
+      const dy = inputVariable('Dy', inputs[0].dataType, inputs[0].dims, components);
+      const output = outputVariable('result', inputs[0].dataType, outputShape, components);
       const codeSnippet4 = `{
         let batch: u32 = global_id.z / outShape[1];
         let r = global_id.z % outShape[1];
@@ -73,7 +74,7 @@ const createConvTranspose2DOpProgramShaderSource =
           dotProd[i] = vec4<f32>(0.0);
         }
         for (var wR: u32 = 0; wR < filterDims[0]; wR = wR + 1) {
-          var dyR = f32(dyCorner.x + wR) / f32(strides.x);
+          var dyR = f32(u32(dyCorner.x) + wR) / f32(strides.x);
           let wRPerm: u32= filterDims[0] - 1 - wR;
           if (dyR < 0.0 || dyR >= f32(outBackprop[1]) ||
               fract(dyR) > 0.0) {
@@ -82,8 +83,8 @@ const createConvTranspose2DOpProgramShaderSource =
           let idyR: u32 = u32(dyR);
 
           for (var wC: u32 = 0; wC < filterDims[1]; wC = wC + 1) {
-            let dyC = f32(dyCorner.y + wC) / f32(strides.y);
-            let dyC2 = f32(dyCorner.y + 1 + wC) / f32(strides.y);
+            let dyC = f32(u32(dyCorner.y) + wC) / f32(strides.y);
+            let dyC2 = f32(u32(dyCorner.y) + u32(1) + wC) / f32(strides.y);
             let wCPerm: u32 = filterDims[1] - 1 - wC;
             var bDyCVal = true;
             var bDyCVal2 = true;
@@ -108,19 +109,19 @@ const createConvTranspose2DOpProgramShaderSource =
 
                 var xValue = ${
           isChannelsLast ? dy.get('batch', 'idyR', 'idyC', 'd2') : dy.get('batch', 'd2', 'idyR', 'idyC')};
-                let tmpval = vec4<f32>(xValue * wValue0,
-                                      xValue * wValue1,
-                                      xValue * wValue2,
-                                      xValue * wValue3);
+                let tmpval = vec4<f32>(dot(xValue, wValue0),
+                                      dot(xValue, wValue1),
+                                      dot(xValue, wValue2),
+                                      dot(xValue, wValue3));
                 dotProd[0] = dotProd[0] + tmpval;
 
                 xValue =  ${
           isChannelsLast ? dy.get('batch', 'idyR', 'idyC2', 'd2') : dy.get('batch', 'd2', 'idyR', 'idyC2')};
 
-                dotProd[1] = dotProd[1] + vec4<f32>(xValue * wValue0,
-                                                    xValue * wValue1,
-                                                    xValue * wValue2,
-                                                    xValue * wValue3);
+                dotProd[1] = dotProd[1] + vec4<f32>(dot(xValue, wValue0),
+                                                    dot(xValue, wValue1),
+                                                    dot(xValue, wValue2),
+                                                    dot(xValue, wValue3));
               }
             } else if (bDyCVal) {
               let d2Length = outBackprop[3];
@@ -132,10 +133,10 @@ const createConvTranspose2DOpProgramShaderSource =
 
                 var xValue = ${
           isChannelsLast ? dy.get('batch', 'idyR', 'idyC', 'd2') : dy.get('batch', 'd2', 'idyR', 'idyC')};
-                let tmpval = vec4<f32>(xValue * wValue0,
-                                      xValue * wValue1,
-                                      xValue * wValue2,
-                                      xValue * wValue3);
+                let tmpval = vec4<f32>(dot(xValue, wValue0),
+                                      dot(xValue, wValue1),
+                                      dot(xValue, wValue2),
+                                      dot(xValue, wValue3));
                 dotProd[0] = dotProd[0] + tmpval;
               }
             } else if (bDyCVal2) {
@@ -148,10 +149,10 @@ const createConvTranspose2DOpProgramShaderSource =
 
                 var xValue = ${
           isChannelsLast ? dy.get('batch', 'idyR', 'idyC', 'd2') : dy.get('batch', 'd2', 'idyR', 'idyC')};
-                let tmpval = vec4<f32>(xValue * wValue0,
-                                      xValue * wValue1,
-                                      xValue * wValue2,
-                                      xValue * wValue3);
+                let tmpval = vec4<f32>(dot(xValue, wValue0),
+                                      dot(xValue, wValue1),
+                                      dot(xValue, wValue2),
+                                      dot(xValue, wValue3));
                 dotProd[1] = dotProd[1] + tmpval;
               }
             }
@@ -159,7 +160,8 @@ const createConvTranspose2DOpProgramShaderSource =
         }
 
         for (var i: u32 = 0; i < ${workPerThread}; i = i + 1) {
-          ${output.set('batch', 'r', 'c+i', 'd1', 'dotProd[i]')};
+          let value = dotProd[i] + ${hasBias ? 'getBiasByOutputCoords(vec4<u32>(batch, r, c + i, d1));' : '0.0'}
+          ${output.set('batch', 'r', 'c + i', 'd1', 'value')};
         }
       }`;
       const codeSnippet = `
@@ -210,7 +212,7 @@ const createConvTranspose2DOpProgramShaderSource =
       return `
   ${w.impl('indicesToOffset', 'get')}
   ${dy.impl('indicesToOffset', 'get')}
-  ${output.impl('offsetToIndices')}
+  ${output.impl('offsetToIndices', 'indicesToOffset', 'set')}
   ${declareFunctions}
   ${declareInputs.join('\n')}
   @group(0) @binding(${declareInputs.length}) var<storage, read_write> result: array<${isVec4 ? 'vec4<f32>' : 'f32'}>;
